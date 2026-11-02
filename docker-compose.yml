@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Database Storage
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cross_insurer
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d cross_insurer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Microservices
+  fingerprint_service:
+    build: ./services/fingerprint_service
+    environment:
+      - CONSORTIUM_SALT=dev-salt-abc-123
+    ports:
+      - "8001:8000"
+
+  similarity_service:
+    build: ./services/similarity_service
+    ports:
+      - "8002:8000"
+
+  decision_service:
+    build: ./services/decision_service
+    environment:
+      - FINGERPRINT_SERVICE_URL=http://fingerprint_service:8000/fingerprint
+      - SIMILARITY_SERVICE_URL=http://similarity_service:8000/similarity
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/cross_insurer
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fingerprint_service:
+        condition: service_started
+      similarity_service:
+        condition: service_started
+
+  ingestion_service:
+    build: ./services/ingestion_service
+    environment:
+      - DECISION_SERVICE_URL=http://decision_service:8000/evaluate_claim
+    ports:
+      - "8004:8000"
+    depends_on:
+      - decision_service
+
+  # Central API Gateway & Dashboard Host
+  gateway:
+    build:
+      context: .
+      dockerfile: ./services/gateway/Dockerfile
+    environment:
+      - DECISION_SERVICE_URL=http://decision_service:8000
+      - FINGERPRINT_SERVICE_URL=http://fingerprint_service:8000
+      - SIMILARITY_SERVICE_URL=http://similarity_service:8000
+      - INGESTION_SERVICE_URL=http://ingestion_service:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - decision_service
+      - fingerprint_service
+      - similarity_service
+      - ingestion_service
+
+volumes:
+  pgdata:

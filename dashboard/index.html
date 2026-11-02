@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Insurer Fraud Consortium & Deduplication Framework</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #080c14;
+            --surface: #0f172a;
+            --surface-card: #141e33;
+            --surface-border: #26354d;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59, 130, 246, 0.35);
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            font-size: 15px;
+        }
+
+        /* Top Header */
+        header {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 17, 32, 0.9));
+            border-bottom: 1px solid var(--surface-border);
+            padding: 1.1rem 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(14px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.45);
+        }
+
+        .brand-text h1 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        .header-meta {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--success);
+            padding: 0.45rem 1.1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Navigation Tabs */
+        nav.tabs {
+            background: var(--surface);
+            border-bottom: 1px solid var(--surface-border);
+            padding: 0 2.5rem;
+            display: flex;
+            gap: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.98rem;
+            font-weight: 700;
+            padding: 1.1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .tab-btn.active {
+            color: #60a5fa;
+            border-bottom-color: var(--primary);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        /* Main Widescreen Container */
+        main {
+            flex: 1;
+            padding: 2rem 2.5rem;
+            max-width: 96%;
+            width: 96%;
+            margin: 0 auto;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive Grids */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .grid-graph {
+            display: grid;
+            grid-template-columns: 1.65fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1200px) {
+            .grid-2, .grid-graph { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--surface-card);
+            border: 1px solid var(--surface-border);
+            border-radius: 18px;
+            padding: 2rem;
+            box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .card h2 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            margin-bottom: 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1.15rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.85rem 1.1rem;
+            background: #090e1a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.95rem 1.75rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+        }
+
+        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+
+        .btn-secondary {
+            background: #253349;
+            color: var(--text-primary);
+        }
+        .btn-secondary:hover { background: #334460; }
+
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #059669; }
+
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+
+        .btn-purple {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        }
+        .btn-purple:hover {
+            opacity: 0.95;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.65rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn-group .btn {
+            flex: 1;
+            padding: 0.65rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.45rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-UNIQUE { background: rgba(16, 185, 129, 0.18); color: var(--success); border: 1px solid var(--success); }
+        .badge-NEAR_DUPLICATE { background: rgba(245, 158, 11, 0.18); color: var(--warning); border: 1px solid var(--warning); }
+        .badge-EXACT_DUPLICATE { background: rgba(239, 68, 68, 0.18); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-CRITICAL { background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid var(--danger); }
+        .badge-HIGH { background: rgba(245, 158, 11, 0.25); color: #fde68a; border: 1px solid var(--warning); }
+        .badge-LOW { background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid var(--success); }
+
+        /* Hash Display */
+        .hash-code {
+            font-family: 'JetBrains Mono', monospace;
+            background: #090e1a;
+            border: 1px solid #334155;
+            padding: 0.9rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            color: #60a5fa;
+            word-break: break-all;
+        }
+
+        /* Explainable AI Breakdown */
+        .xai-container {
+            margin-top: 1.5rem;
+            background: #090e1a;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 1.5rem;
+        }
+
+        .xai-header {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #c084fc;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .xai-bar-group {
+            margin-bottom: 1.1rem;
+        }
+
+        .xai-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.88rem;
+            margin-bottom: 0.4rem;
+            color: var(--text-secondary);
+        }
+
+        .xai-progress {
+            height: 10px;
+            background: #1e293b;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .xai-progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .xai-reason {
+            margin-top: 1.25rem;
+            padding: 1rem;
+            background: rgba(139, 92, 246, 0.12);
+            border-left: 4px solid var(--accent-purple);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .stat-card {
+            background: var(--surface-card);
+            border: 1px solid var(--surface-border);
+            border-radius: 16px;
+            padding: 1.6rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-card .label {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.6rem;
+        }
+
+        .stat-card .value {
+            font-size: 2.35rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+        }
+
+        /* Graph Network Area */
+        .graph-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        #cy {
+            width: 100%;
+            height: 680px;
+            background: #090e1a;
+            border: 1px solid var(--surface-border);
+            border-radius: 14px;
+        }
+
+        .graph-controls {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 0.4rem;
+            border-radius: 10px;
+            border: 1px solid var(--surface-border);
+            backdrop-filter: blur(8px);
+        }
+
+        .graph-btn {
+            background: #1e293b;
+            color: white;
+            border: 1px solid #334155;
+            padding: 0.45rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .graph-btn:hover { background: var(--primary); border-color: var(--primary); }
+
+        .ring-card {
+            background: #090e1a;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s, transform 0.1s;
+        }
+        .ring-card:hover {
+            border-color: var(--primary);
+            background: #10182b;
+            transform: translateY(-1px);
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--surface-border);
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+            text-align: left;
+        }
+
+        th {
+            background: #090e1a;
+            padding: 1rem 1.25rem;
+            color: var(--text-secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--surface-border);
+        }
+
+        td {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+            color: #cbd5e1;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Simulation Stepper */
+        .sim-stepper {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .sim-step {
+            background: #090e1a;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .sim-step.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.25);
+        }
+
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            font-size: 0.95rem;
+            font-weight: 800;
+            margin-right: 0.75rem;
+        }
+
+        /* Confusion Matrix */
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: 140px 1fr 1fr;
+            gap: 8px;
+            background: #090e1a;
+            padding: 1.25rem;
+            border-radius: 14px;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+
+        .matrix-cell {
+            padding: 1.5rem 1rem;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .matrix-cell.tp { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--success); }
+        .matrix-cell.fp { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); }
+        .matrix-cell.fn { background: rgba(245, 158, 11, 0.2); border: 1px solid var(--warning); }
+        .matrix-cell.tn { background: rgba(59, 130, 246, 0.2); border: 1px solid var(--primary); }
+
+        .matrix-val { font-size: 2.1rem; font-weight: 900; margin-top: 0.35rem; }
+    </style>
+</head>
+<body>
+
+    <!-- Top Header -->
+    <header>
+        <div class="brand">
+            <div class="brand-icon">🛡️</div>
+            <div class="brand-text">
+                <h1>CROSS-INSURER FRAUD DEDUPLICATION CONSORTIUM</h1>
+                <p>Distributed Privacy-Preserving Claim Deduplication & Smart Contract Audit Registry</p>
+            </div>
+        </div>
+        <div class="header-meta">
+            <div class="status-pill">
+                <div class="status-dot"></div>
+                <span id="header-status-text">Consortium Mesh Online (5 Services Active)</span>
+            </div>
+            <button class="btn btn-secondary" onclick="resetConsortiumSystem()" style="padding: 0.55rem 1rem; font-size: 0.85rem;">
+                🔄 Reset System
+            </button>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs">
+        <button class="tab-btn active" onclick="switchTab('evaluation')">
+            🛡️ Claim Evaluation & XAI
+        </button>
+        <button class="tab-btn" onclick="switchTab('graph')">
+            🕸️ Fraud Ring Graph
+        </button>
+        <button class="tab-btn" onclick="switchTab('ledger')">
+            ⛓️ Consortium Ledger
+        </button>
+        <button class="tab-btn" onclick="switchTab('simulation')">
+            🚀 Live Attack Simulator
+        </button>
+        <button class="tab-btn" onclick="switchTab('benchmark')">
+            📊 Academic Benchmark
+        </button>
+    </nav>
+
+    <!-- Main Container -->
+    <main>
+
+        <!-- TAB 1: CLAIM EVALUATION & XAI -->
+        <div id="tab-evaluation" class="tab-content active">
+            <div class="grid-2">
+                
+                <!-- Submission Form Card -->
+                <div class="card">
+                    <h2>
+                        <span>Submit Claim for Deduplication</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Deterministic Salted Hashing</span>
+                    </h2>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="loadPreset('original')">Preset 1: Original</button>
+                        <button class="btn btn-secondary" onclick="loadPreset('exact')">Preset 2: Exact Dup</button>
+                        <button class="btn btn-secondary" onclick="loadPreset('near')">Preset 3: Near Dup</button>
+                        <button class="btn btn-secondary" onclick="loadPreset('unique')">Preset 4: Clean Unique</button>
+                    </div>
+
+                    <form id="claim-form" onsubmit="handleClaimSubmit(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Claim ID</label>
+                                <input type="text" id="inp_claim_id" value="c-100" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Insurer ID</label>
+                                <select id="inp_insurer_id">
+                                    <option value="InsurerA">Insurer A (Liberty Alliance)</option>
+                                    <option value="InsurerB">Insurer B (Prudential Shield)</option>
+                                    <option value="InsurerC">Insurer C (Apex Mutual)</option>
+                                    <option value="InsurerD">Insurer D (Vanguard Life)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Policy Type</label>
+                                <select id="inp_policy_type">
+                                    <option value="Auto">Auto Collision</option>
+                                    <option value="Health">Health / Medical</option>
+                                    <option value="Property">Property / Casualty</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Claimant ID (SSN / Tax ID)</label>
+                                <input type="text" id="inp_claimant_id" value="123-45-6789" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Incident Date (ISO-8601)</label>
+                                <input type="text" id="inp_incident_date" value="2024-10-15T12:00:00" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Claim Amount ($)</label>
+                                <input type="number" step="0.01" id="inp_claim_amount" value="1500.00" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Provider ID</label>
+                                <input type="text" id="inp_provider_id" value="prv-999" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Diagnosis / Incident Code</label>
+                                <input type="text" id="inp_diagnosis_code" value="coll-123" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Claim Description / Incident Narrative</label>
+                            <textarea id="inp_description" rows="3" required>Minor fender bender on main st</textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-purple" style="width: 100%; padding: 1.1rem;">
+                            ⚡ Run Deduplication & Semantic Matching
+                        </button>
+                    </form>
+
+                    <!-- Batch CSV Upload Card -->
+                    <div style="margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--surface-border);">
+                        <label>Bulk Ingestion (CSV)</label>
+                        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+                            <input type="file" id="batch-file-input" accept=".csv" style="padding: 0.65rem;">
+                            <button class="btn btn-secondary" onclick="handleBatchUpload()">Ingest</button>
+                        </div>
+                        <div id="batch-upload-msg" style="margin-top: 0.6rem; font-size: 0.85rem; color: var(--text-muted); display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Analysis & XAI Results Panel -->
+                <div class="card" id="evaluation-results-card">
+                    <h2>Consortium Evaluation Verdict</h2>
+                    
+                    <div id="evaluation-placeholder" style="text-align: center; padding: 4rem 1rem; color: var(--text-muted);">
+                        <div style="font-size: 3rem; margin-bottom: 0.75rem;">🔍</div>
+                        <p style="font-size: 1.05rem; line-height: 1.6;">
+                            Submit a claim to generate deterministic fingerprint, check on-chain ledger, and run explainable semantic AI matching.
+                        </p>
+                    </div>
+
+                    <div id="evaluation-details" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <span id="res-badge" class="badge">--</span>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">CONFIDENCE</div>
+                                <div id="res-confidence" style="font-size: 2.2rem; font-weight: 900; color: #60a5fa;">--</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Deterministic Salted Fingerprint (SHA-256)</label>
+                            <div class="hash-code" id="res-exact-hash">--</div>
+                        </div>
+
+                        <!-- On-Chain Blockchain Receipt Badge (if present) -->
+                        <div id="res-blockchain-box" style="display: none; margin-bottom: 1.25rem; padding: 1rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 10px; font-size: 0.88rem;">
+                            <div style="display: flex; justify-content: space-between; font-weight: 700; color: #93c5fd; margin-bottom: 0.4rem;">
+                                <span>⛓️ Consortium Blockchain Event: <span id="res-blockchain-event">--</span></span>
+                                <span>Block #<span id="res-blockchain-block">--</span></span>
+                            </div>
+                            <div style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 0.82rem;">
+                                TX: <span id="res-blockchain-tx">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Explainable AI (XAI) Breakdown -->
+                        <div class="xai-container">
+                            <div class="xai-header">
+                                <span>🔬 Explainable AI (XAI) Multi-Vector Breakdown</span>
+                                <span id="res-composite-score" style="color: var(--primary);">--</span>
+                            </div>
+
+                            <!-- Amount -->
+                            <div class="xai-bar-group">
+                                <div class="xai-bar-label">
+                                    <span>Payout Amount Proximity (Weight: 25%)</span>
+                                    <span id="xai-amt-text">Score: --</span>
+                                </div>
+                                <div class="xai-progress">
+                                    <div class="xai-progress-fill" id="xai-amt-bar" style="width: 0%; background: #3b82f6;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Date -->
+                            <div class="xai-bar-group">
+                                <div class="xai-bar-label">
+                                    <span>Temporal Incident Proximity (Weight: 25%)</span>
+                                    <span id="xai-date-text">Score: --</span>
+                                </div>
+                                <div class="xai-progress">
+                                    <div class="xai-progress-fill" id="xai-date-bar" style="width: 0%; background: #10b981;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Semantic Narrative -->
+                            <div class="xai-bar-group">
+                                <div class="xai-bar-label">
+                                    <span>Semantic Narrative NLP Cosine (Weight: 30%)</span>
+                                    <span id="xai-semantic-text">Score: --</span>
+                                </div>
+                                <div class="xai-progress">
+                                    <div class="xai-progress-fill" id="xai-semantic-bar" style="width: 0%; background: #8b5cf6;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Entity Overlap -->
+                            <div class="xai-bar-group">
+                                <div class="xai-bar-label">
+                                    <span>Cross-Insurer Entity Overlap (Weight: 20%)</span>
+                                    <span id="xai-entity-text">Score: --</span>
+                                </div>
+                                <div class="xai-progress">
+                                    <div class="xai-progress-fill" id="xai-entity-bar" style="width: 0%; background: #f59e0b;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Natural Language Reasoning -->
+                            <div class="xai-reason" id="xai-reasoning-text">
+                                Evaluating claim against multi-party consortium...
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TAB 2: FRAUD RING & SYNDICATE GRAPH -->
+        <div id="tab-graph" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">Total Network Nodes</div>
+                    <div class="value" id="graph-stat-nodes" style="color: #60a5fa;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Fraud Rings / Syndicates</div>
+                    <div class="value" id="graph-stat-rings" style="color: #f87171;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">High-Risk Collusive Entities</div>
+                    <div class="value" id="graph-stat-highrisk" style="color: #fbbf24;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Participating Carriers</div>
+                    <div class="value" id="graph-stat-insurers" style="color: #34d399;">0</div>
+                </div>
+            </div>
+
+            <div class="grid-graph">
+                <!-- Large Interactive Graph Card -->
+                <div class="card" style="padding: 1.5rem;">
+                    <h2>
+                        <span>Interactive Entity Collusion Graph</span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="injectSampleRingAndReload()" style="padding: 0.5rem 1rem; font-size: 0.82rem; background: linear-gradient(135deg, #8b5cf6, #3b82f6);">
+                                ⚡ Populate Sample Collusion Ring
+                            </button>
+                            <button class="btn btn-secondary" onclick="loadGraphAnalytics()" style="padding: 0.5rem 0.9rem; font-size: 0.82rem;">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </h2>
+                    
+                    <div class="graph-wrapper">
+                        <!-- Floating Controls for Zoom and Layout -->
+                        <div class="graph-controls">
+                            <button class="graph-btn" onclick="zoomGraph(1.3)" title="Zoom In">🔍 +</button>
+                            <button class="graph-btn" onclick="zoomGraph(0.7)" title="Zoom Out">🔍 −</button>
+                            <button class="graph-btn" onclick="resetGraphView()" title="Fit to View">⛶ Fit View</button>
+                            <button class="graph-btn" onclick="relayoutGraph()" title="Re-arrange Nodes">🔄 Spread</button>
+                        </div>
+
+                        <div id="cy"></div>
+                    </div>
+
+                    <div style="display: flex; gap: 1.5rem; margin-top: 1rem; font-size: 0.85rem; color: #cbd5e1; flex-wrap: wrap; background: #090e1a; padding: 0.75rem 1rem; border-radius: 8px;">
+                        <span>🟣 <strong>Insurer Node</strong></span>
+                        <span>🔵 <strong>Claim Node</strong></span>
+                        <span>🟠 <strong>Claimant Node</strong></span>
+                        <span>🔴 <strong>High-Risk Collusive Provider</strong></span>
+                    </div>
+                </div>
+
+                <!-- Syndicates / Rings Sidebar -->
+                <div class="card">
+                    <h2>
+                        <span>Detected Fraud Syndicates</span>
+                        <span id="rings-badge-count" class="badge badge-CRITICAL" style="display: none;">0 RINGS</span>
+                    </h2>
+
+                    <div id="fraud-rings-list" style="max-height: 680px; overflow-y: auto;">
+                        <div style="background: #090e1a; border: 1px dashed #334155; border-radius: 12px; padding: 2rem 1.5rem; text-align: center;">
+                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🕸️</div>
+                            <strong style="font-size: 1.1rem; display: block; margin-bottom: 0.5rem; color: #f8fafc;">
+                                No Active Fraud Rings Detected
+                            </strong>
+                            <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">
+                                Currently stored claims are unique or belong to single carriers. To observe how the Graph Network detects cross-carrier collusion:
+                            </p>
+                            <button class="btn btn-purple" onclick="injectSampleRingAndReload()" style="width: 100%; margin-bottom: 0.75rem;">
+                                ⚡ Inject 4-Carrier Collision Attack
+                            </button>
+                            <button class="btn btn-secondary" onclick="switchTab('simulation')" style="width: 100%;">
+                                🚀 View Live Attack Simulator Tab
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: CONSORTIUM SMART CONTRACT LEDGER -->
+        <div id="tab-ledger" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">Ledger Block Height</div>
+                    <div class="value" id="ledger-stat-height" style="color: #60a5fa;">100</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Registered Claim Hashes</div>
+                    <div class="value" id="ledger-stat-claims" style="color: #34d399;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Duplicate Alerts Emitted</div>
+                    <div class="value" id="ledger-stat-alerts" style="color: #f87171;">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Smart Contract Address</div>
+                    <div class="value" style="font-size: 1.05rem; font-family: 'JetBrains Mono', monospace; color: #c084fc; margin-top: 0.6rem;">
+                        0x5FbDB...80aa3
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <span>Immutable On-Chain Event Log (ClaimRegistry.sol)</span>
+                    <button class="btn btn-secondary" onclick="loadLedger()" style="padding: 0.45rem 1rem; font-size: 0.85rem;">
+                        🔄 Refresh Ledger
+                    </button>
+                </h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Block #</th>
+                                <th>Timestamp</th>
+                                <th>Event Type</th>
+                                <th>Submitting Insurer</th>
+                                <th>Claim ID</th>
+                                <th>Salted SHA-256 Hash</th>
+                                <th>Transaction Hash</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-table-body">
+                            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading consortium ledger...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: TEACHER DEMO: MULTI-INSURER ATTACK SIMULATOR -->
+        <div id="tab-simulation" class="tab-content">
+            <div class="card" style="margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+                    <div>
+                        <h2>Teacher Presentation: Multi-Carrier Fraud Attack Simulation</h2>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem; max-width: 900px; line-height: 1.6;">
+                            Demonstrates how a sophisticated fraud ring attempts to "double-dip" and file padded claims across 4 competing insurers (Insurer A, B, C, D) and how the consortium stops them at every layer without leaking raw PII.
+                        </p>
+                    </div>
+                    <button class="btn btn-purple" id="btn-run-sim" onclick="executeSimulationDemo()" style="padding: 1.1rem 2.25rem; font-size: 1.05rem;">
+                        🚀 Launch Live Multi-Insurer Simulation
+                    </button>
+                </div>
+            </div>
+
+            <div class="sim-stepper" id="sim-stepper-container">
+                <div style="text-align: center; padding: 4rem; color: var(--text-muted); background: var(--surface-card); border-radius: 16px; border: 1px solid var(--surface-border);">
+                    <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎬</div>
+                    <p style="font-size: 1.1rem;">Click <strong>"Launch Live Multi-Insurer Simulation"</strong> above to trigger the real-time choreographed attack scenario.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: ACADEMIC BENCHMARK & EVALUATION -->
+        <div id="tab-benchmark" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">Precision</div>
+                    <div class="value" id="bench-stat-precision" style="color: #34d399;">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Recall (Sensitivity)</div>
+                    <div class="value" id="bench-stat-recall" style="color: #60a5fa;">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">F1-Score</div>
+                    <div class="value" id="bench-stat-f1" style="color: #c084fc;">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Mean Pipeline Latency</div>
+                    <div class="value" id="bench-stat-latency" style="color: #fbbf24;">--</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Confusion Matrix Card -->
+                <div class="card">
+                    <h2>
+                        <span>Confusion Matrix (Ground Truth Evaluation)</span>
+                        <span id="bench-accuracy-badge" class="badge badge-LOW">Accuracy: --</span>
+                    </h2>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label>Similarity Threshold Tuning: <span id="threshold-val-label" style="color: var(--primary); font-weight: 800; font-size: 1rem;">0.85</span></label>
+                        <input type="range" id="threshold-slider" min="0.50" max="0.95" step="0.05" value="0.85" oninput="updateBenchmarkThreshold(this.value)" style="margin-top: 0.4rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
+                            <span>0.50 (Loose Matching)</span>
+                            <span>0.85 (Recommended Default)</span>
+                            <span>0.95 (Strict Matching)</span>
+                        </div>
+                    </div>
+
+                    <div class="confusion-matrix">
+                        <div></div>
+                        <div style="font-weight: 800; color: var(--text-secondary); font-size: 0.85rem;">PREDICTED DUP</div>
+                        <div style="font-weight: 800; color: var(--text-secondary); font-size: 0.85rem;">PREDICTED UNIQUE</div>
+
+                        <div style="font-weight: 800; color: var(--text-secondary); font-size: 0.85rem; text-align: left; display: flex; align-items: center;">ACTUAL DUP</div>
+                        <div class="matrix-cell tp">
+                            <span style="font-size: 0.85rem; color: #a7f3d0; font-weight: 700;">True Positive (TP)</span>
+                            <span class="matrix-val" id="cm-tp" style="color: var(--success);">0</span>
+                        </div>
+                        <div class="matrix-cell fn">
+                            <span style="font-size: 0.85rem; color: #fde68a; font-weight: 700;">False Negative (FN)</span>
+                            <span class="matrix-val" id="cm-fn" style="color: var(--warning);">0</span>
+                        </div>
+
+                        <div style="font-weight: 800; color: var(--text-secondary); font-size: 0.85rem; text-align: left; display: flex; align-items: center;">ACTUAL UNIQUE</div>
+                        <div class="matrix-cell fp">
+                            <span style="font-size: 0.85rem; color: #fca5a5; font-weight: 700;">False Positive (FP)</span>
+                            <span class="matrix-val" id="cm-fp" style="color: var(--danger);">0</span>
+                        </div>
+                        <div class="matrix-cell tn">
+                            <span style="font-size: 0.85rem; color: #93c5fd; font-weight: 700;">True Negative (TN)</span>
+                            <span class="matrix-val" id="cm-tn" style="color: var(--primary);">0</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
+                        <button class="btn btn-secondary" onclick="exportAcademicSummary()">
+                            📄 Export Academic Report Summary
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sample Benchmark Breakdown -->
+                <div class="card">
+                    <h2>Test Suite Sample Verifications</h2>
+                    <div class="table-container" style="max-height: 480px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Claim ID</th>
+                                    <th>Expected</th>
+                                    <th>Predicted</th>
+                                    <th>Confidence</th>
+                                    <th>Verdict</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bench-samples-body">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading benchmark suite...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // API Base Discovery
+        const API_BASE = window.location.origin;
+
+        // Presets for demo
+        const PRESETS = {
+            original: {
+                claim_id: "c-100", insurer_id: "InsurerA", policy_type: "Auto", claimant_id: "123-45-6789",
+                incident_date: "2024-10-15T12:00:00", claim_amount: 1500.00, provider_id: "prv-999",
+                diagnosis_or_incident_code: "coll-123", description: "Minor fender bender on main st"
+            },
+            exact: {
+                claim_id: "c-999", insurer_id: "InsurerB", policy_type: "Auto", claimant_id: " 123-45-6789 ",
+                incident_date: "2024-10-15", claim_amount: 1500.0, provider_id: "PRV-999",
+                diagnosis_or_incident_code: "COLL-123", description: "Minor fender bender on main st"
+            },
+            near: {
+                claim_id: "c-555", insurer_id: "InsurerC", policy_type: "Auto", claimant_id: "123-45-6789",
+                incident_date: "2024-10-16T12:00:00", claim_amount: 1550.00, provider_id: "prv-999",
+                diagnosis_or_incident_code: "coll-123", description: "Minor fender bender on main street"
+            },
+            unique: {
+                claim_id: "c-777", insurer_id: "InsurerA", policy_type: "Property", claimant_id: "999-88-7777",
+                incident_date: "2024-11-01T08:00:00", claim_amount: 5000.00, provider_id: "prv-111",
+                diagnosis_or_incident_code: "fire-01", description: "Kitchen fire damage caused by electrical short."
+            }
+        };
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Find tab button matching tabId
+            const buttons = Array.from(document.querySelectorAll('.tab-btn'));
+            const matchingBtn = buttons.find(b => b.getAttribute('onclick').includes(tabId));
+            if (matchingBtn) matchingBtn.classList.add('active');
+
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            if (tabId === 'graph') {
+                setTimeout(loadGraphAnalytics, 150);
+            } else if (tabId === 'ledger') {
+                loadLedger();
+            } else if (tabId === 'benchmark') {
+                loadBenchmarkStats();
+            }
+        }
+
+        function loadPreset(key) {
+            const p = PRESETS[key];
+            if (!p) return;
+            document.getElementById('inp_claim_id').value = p.claim_id;
+            document.getElementById('inp_insurer_id').value = p.insurer_id;
+            document.getElementById('inp_policy_type').value = p.policy_type;
+            document.getElementById('inp_claimant_id').value = p.claimant_id;
+            document.getElementById('inp_incident_date').value = p.incident_date;
+            document.getElementById('inp_claim_amount').value = p.claim_amount;
+            document.getElementById('inp_provider_id').value = p.provider_id;
+            document.getElementById('inp_diagnosis_code').value = p.diagnosis_or_incident_code;
+            document.getElementById('inp_description').value = p.description;
+        }
+
+        async function handleClaimSubmit(e) {
+            e.preventDefault();
+            const payload = {
+                claim_id: document.getElementById('inp_claim_id').value,
+                insurer_id: document.getElementById('inp_insurer_id').value,
+                policy_type: document.getElementById('inp_policy_type').value,
+                claimant_id: document.getElementById('inp_claimant_id').value,
+                incident_date: document.getElementById('inp_incident_date').value,
+                claim_amount: parseFloat(document.getElementById('inp_claim_amount').value),
+                provider_id: document.getElementById('inp_provider_id').value,
+                diagnosis_or_incident_code: document.getElementById('inp_diagnosis_code').value,
+                description: document.getElementById('inp_description').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/evaluate_claim`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+                const data = await res.json();
+                renderEvaluationResult(data);
+            } catch (err) {
+                alert(`Evaluation failed: ${err.message}`);
+                console.error(err);
+            }
+        }
+
+        function renderEvaluationResult(data) {
+            document.getElementById('evaluation-placeholder').style.display = 'none';
+            document.getElementById('evaluation-details').style.display = 'block';
+
+            const badge = document.getElementById('res-badge');
+            badge.className = `badge badge-${data.status}`;
+            badge.innerText = data.status.replace('_', ' ');
+
+            document.getElementById('res-confidence').innerText = `${(data.confidence * 100).toFixed(1)}%`;
+            document.getElementById('res-exact-hash').innerText = data.exact_hash || 'N/A';
+
+            // Blockchain transaction info
+            const bcBox = document.getElementById('res-blockchain-box');
+            if (data.blockchain_tx) {
+                bcBox.style.display = 'block';
+                document.getElementById('res-blockchain-event').innerText = data.blockchain_tx.event_type;
+                document.getElementById('res-blockchain-block').innerText = data.blockchain_tx.block_number;
+                document.getElementById('res-blockchain-tx').innerText = data.blockchain_tx.tx_hash;
+            } else {
+                bcBox.style.display = 'none';
+            }
+
+            // XAI Breakdown
+            const xai = data.explanation;
+            if (xai && xai.amount) {
+                document.getElementById('res-composite-score').innerText = `Score: ${(xai.composite_score * 100).toFixed(1)}%`;
+                
+                // Amount Bar
+                const amtPct = Math.min(100, (xai.amount.score * 100).toFixed(0));
+                document.getElementById('xai-amt-bar').style.width = `${amtPct}%`;
+                document.getElementById('xai-amt-text').innerText = `${amtPct}% ($Δ: $${xai.amount.delta.toFixed(2)})`;
+
+                // Date Bar
+                const datePct = Math.min(100, (xai.date.score * 100).toFixed(0));
+                document.getElementById('xai-date-bar').style.width = `${datePct}%`;
+                document.getElementById('xai-date-text').innerText = `${datePct}% (${xai.date.days_delta} day Δ)`;
+
+                // Semantic Bar
+                const semPct = Math.min(100, (xai.semantic.score * 100).toFixed(0));
+                document.getElementById('xai-semantic-bar').style.width = `${semPct}%`;
+                document.getElementById('xai-semantic-text').innerText = `${semPct}% (Cosine: ${(xai.semantic.vector_cosine*100).toFixed(0)}%)`;
+
+                // Entity Bar
+                const entPct = Math.min(100, (xai.entity.score * 100).toFixed(0));
+                document.getElementById('xai-entity-bar').style.width = `${entPct}%`;
+                document.getElementById('xai-entity-text').innerText = `${entPct}% (${xai.entity.is_cross_insurer ? 'Cross-Carrier' : 'Same Carrier'})`;
+
+                // Reasoning
+                document.getElementById('xai-reasoning-text').innerText = xai.verdict_reason;
+            } else {
+                document.getElementById('res-composite-score').innerText = '--';
+                document.getElementById('xai-amt-bar').style.width = '0%';
+                document.getElementById('xai-date-bar').style.width = '0%';
+                document.getElementById('xai-semantic-bar').style.width = '0%';
+                document.getElementById('xai-entity-bar').style.width = '0%';
+                document.getElementById('xai-reasoning-text').innerText = xai ? xai.verdict_reason : 'No prior collisions detected.';
+            }
+        }
+
+        // --- GRAPH NETWORK ANALYTICS ---
+        let cyInstance = null;
+
+        async function loadGraphAnalytics() {
+            try {
+                const res = await fetch(`${API_BASE}/graph/analytics`);
+                if (!res.ok) throw new Error("Failed to fetch graph data");
+                const data = await res.json();
+
+                document.getElementById('graph-stat-nodes').innerText = data.nodes.length;
+                document.getElementById('graph-stat-rings').innerText = data.summary.rings_detected;
+                document.getElementById('graph-stat-highrisk').innerText = data.summary.high_risk_entities;
+                document.getElementById('graph-stat-insurers').innerText = data.summary.total_insurers;
+
+                renderCytoscapeGraph(data.nodes, data.edges);
+                renderFraudRings(data.fraud_rings);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function injectSampleRingAndReload() {
+            try {
+                const res = await fetch(`${API_BASE}/simulate/multi_insurer`, { method: 'POST' });
+                if (!res.ok) throw new Error("Failed to inject simulation");
+                await loadGraphAnalytics();
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+            }
+        }
+
+        function renderCytoscapeGraph(nodes, edges) {
+            const elements = [];
+            nodes.forEach(n => {
+                let color = '#3b82f6';
+                let size = 52;
+                if (n.type === 'insurer') { 
+                    color = '#8b5cf6'; 
+                    size = 72; 
+                } else if (n.type === 'claimant') { 
+                    color = '#f59e0b'; 
+                    size = 58; 
+                } else if (n.type === 'provider') { 
+                    color = (n.risk === 'HIGH' || n.risk === 'CRITICAL') ? '#ef4444' : '#10b981'; 
+                    size = 65; 
+                } else if (n.risk === 'HIGH' || n.risk === 'CRITICAL') { 
+                    color = '#ef4444'; 
+                }
+
+                elements.push({
+                    data: {
+                        id: n.id,
+                        label: n.label,
+                        color: color,
+                        size: size,
+                        details: n.details
+                    }
+                });
+            });
+
+            edges.forEach(e => {
+                elements.push({
+                    data: {
+                        id: e.id,
+                        source: e.source,
+                        target: e.target,
+                        label: e.label
+                    }
+                });
+            });
+
+            if (cyInstance) cyInstance.destroy();
+
+            cyInstance = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)',
+                            'label': 'data(label)',
+                            'color': '#ffffff',
+                            'font-size': '13px',
+                            'font-weight': '700',
+                            'font-family': 'Inter',
+                            'text-valign': 'bottom',
+                            'text-margin-y': '8px',
+                            'width': 'data(size)',
+                            'height': 'data(size)',
+                            'border-width': 3,
+                            'border-color': '#1e293b',
+                            'text-background-opacity': 0.9,
+                            'text-background-color': '#090e1a',
+                            'text-background-padding': '4px',
+                            'text-background-shape': 'roundrectangle',
+                            'text-border-width': 1,
+                            'text-border-color': '#334155'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2.5,
+                            'line-color': '#475569',
+                            'target-arrow-color': '#64748b',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier',
+                            'arrow-scale': 1.0,
+                            'label': 'data(label)',
+                            'font-size': '11px',
+                            'font-weight': '600',
+                            'color': '#94a3b8',
+                            'text-rotation': 'autorotate',
+                            'text-margin-y': '-6px',
+                            'text-background-opacity': 0.85,
+                            'text-background-color': '#090e1a',
+                            'text-background-padding': '2px',
+                            'text-background-shape': 'roundrectangle'
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'cose',
+                    animate: true,
+                    animationDuration: 600,
+                    randomize: false,
+                    componentSpacing: 120,
+                    nodeRepulsion: 1500000,
+                    idealEdgeLength: 180,
+                    gravity: 0.25
+                }
+            });
+
+            // Auto-scale to fill viewport prominently
+            cyInstance.on('layoutstop', function() {
+                cyInstance.fit(undefined, 50);
+                if (cyInstance.zoom() < 1.1) {
+                    cyInstance.zoom(1.2);
+                }
+                cyInstance.center();
+            });
+
+            cyInstance.on('tap', 'node', function(evt){
+                const node = evt.target;
+                alert(node.data('details'));
+            });
+        }
+
+        function zoomGraph(factor) {
+            if (!cyInstance) return;
+            cyInstance.zoom(cyInstance.zoom() * factor);
+            cyInstance.center();
+        }
+
+        function resetGraphView() {
+            if (!cyInstance) return;
+            cyInstance.fit(undefined, 50);
+            if (cyInstance.zoom() < 1.1) cyInstance.zoom(1.2);
+            cyInstance.center();
+        }
+
+        function relayoutGraph() {
+            if (!cyInstance) return;
+            cyInstance.layout({
+                name: 'cose',
+                animate: true,
+                componentSpacing: 140,
+                nodeRepulsion: 1800000,
+                idealEdgeLength: 200
+            }).run();
+        }
+
+        function renderFraudRings(rings) {
+            const container = document.getElementById('fraud-rings-list');
+            const badge = document.getElementById('rings-badge-count');
+            
+            if (!rings || rings.length === 0) {
+                badge.style.display = 'none';
+                container.innerHTML = `
+                    <div style="background: #090e1a; border: 1px dashed #334155; border-radius: 12px; padding: 2rem 1.5rem; text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🕸️</div>
+                        <strong style="font-size: 1.1rem; display: block; margin-bottom: 0.5rem; color: #f8fafc;">
+                            No Active Fraud Rings Detected
+                        </strong>
+                        <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">
+                            Currently stored claims are unique or belong to single carriers. To observe how the Graph Network detects cross-carrier collusion:
+                        </p>
+                        <button class="btn btn-purple" onclick="injectSampleRingAndReload()" style="width: 100%; margin-bottom: 0.75rem;">
+                            ⚡ Inject 4-Carrier Collision Attack
+                        </button>
+                        <button class="btn btn-secondary" onclick="switchTab('simulation')" style="width: 100%;">
+                            🚀 View Live Attack Simulator Tab
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            badge.style.display = 'inline-block';
+            badge.innerText = `${rings.length} RING${rings.length > 1 ? 'S' : ''}`;
+
+            container.innerHTML = rings.map(r => `
+                <div class="ring-card" onclick="highlightRing('${r.primary_entity}')">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                        <strong style="font-size: 1.05rem; color: #ffffff;">${r.name}</strong>
+                        <span class="badge badge-${r.risk_level}">${r.risk_level}</span>
+                    </div>
+                    <p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 0.75rem;">
+                        ${r.reason}
+                    </p>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-muted); border-top: 1px solid #1e293b; padding-top: 0.6rem;">
+                        <span>Involved Claims: <strong style="color:white;">${r.member_count}</strong></span>
+                        <span>Total Exposure: <strong style="color: #f87171; font-size: 0.95rem;">$${r.total_exposure.toLocaleString()}</strong></span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function highlightRing(entityId) {
+            if (!cyInstance) return;
+            cyInstance.nodes().forEach(n => {
+                if (n.data('label').includes(entityId) || n.data('id').includes(entityId)) {
+                    n.animate({
+                        style: { 'border-width': 6, 'border-color': '#f59e0b' }
+                    }, { duration: 400 });
+                }
+            });
+        }
+
+        // --- BLOCKCHAIN SMART CONTRACT LEDGER ---
+        async function loadLedger() {
+            try {
+                const res = await fetch(`${API_BASE}/blockchain/ledger`);
+                if (!res.ok) throw new Error("Failed to load blockchain ledger");
+                const data = await res.json();
+
+                document.getElementById('ledger-stat-height').innerText = data.block_height;
+                const uniqueClaims = data.ledger.filter(l => l.event_type === 'ClaimRegistered').length;
+                const alerts = data.ledger.filter(l => l.event_type === 'DuplicateAlert').length;
+
+                document.getElementById('ledger-stat-claims').innerText = uniqueClaims;
+                document.getElementById('ledger-stat-alerts').innerText = alerts;
+
+                const tbody = document.getElementById('ledger-table-body');
+                if (data.ledger.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Consortium ledger empty.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.ledger.map(tx => {
+                    const isAlert = tx.event_type === 'DuplicateAlert';
+                    const eventBadge = isAlert 
+                        ? `<span class="badge badge-EXACT_DUPLICATE">🚨 DuplicateAlert</span>`
+                        : `<span class="badge badge-UNIQUE">✅ ClaimRegistered</span>`;
+
+                    return `
+                        <tr>
+                            <td><strong>#${tx.block_number}</strong></td>
+                            <td style="color: var(--text-muted); font-size: 0.82rem;">${tx.timestamp.substring(11, 19)}</td>
+                            <td>${eventBadge}</td>
+                            <td><strong>${tx.submitting_insurer}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">(${tx.submitting_address.substring(0, 8)}...)</span></td>
+                            <td><code>${tx.claim_id || 'N/A'}</code></td>
+                            <td><code style="color: #60a5fa;">${tx.claim_hash.substring(0, 16)}...</code></td>
+                            <td><code style="color: #c084fc;">${tx.tx_hash.substring(0, 14)}...</code></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // --- TEACHER PRESENTATION SIMULATION ---
+        async function executeSimulationDemo() {
+            const btn = document.getElementById('btn-run-sim');
+            btn.disabled = true;
+            btn.innerText = "⏳ Running Multi-Insurer Attack...";
+
+            const container = document.getElementById('sim-stepper-container');
+            container.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--primary); font-size: 1.1rem;">Simulating cross-insurer consortium attack...</div>`;
+
+            try {
+                const res = await fetch(`${API_BASE}/simulate/multi_insurer`, { method: 'POST' });
+                if (!res.ok) throw new Error("Simulation request failed");
+                const data = await res.json();
+
+                renderSimulationSteps(data.steps, data.total_fraud_prevented);
+            } catch (err) {
+                alert(`Simulation failed: ${err.message}`);
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "🚀 Re-run Multi-Insurer Simulation";
+            }
+        }
+
+        function renderSimulationSteps(steps, fraudPrevented) {
+            const container = document.getElementById('sim-stepper-container');
+            container.innerHTML = `
+                <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 14px; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div>
+                        <strong style="color: var(--success); font-size: 1.25rem;">Consortium Multi-Layer Defense Triggered</strong>
+                        <div style="font-size: 0.95rem; color: var(--text-secondary); margin-top: 0.35rem;">
+                            Exact double-dip blocked on blockchain; perturbed near-duplicate caught by Semantic AI; syndicate ring flagged on graph!
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">TOTAL FRAUD PREVENTED</div>
+                        <div style="font-size: 1.9rem; font-weight: 900; color: #34d399;">$${fraudPrevented.toLocaleString()}</div>
+                    </div>
+                </div>
+            ` + steps.map(s => `
+                <div class="sim-step active">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.9rem;">
+                        <div style="display: flex; align-items: center;">
+                            <span class="step-num">${s.stage}</span>
+                            <strong style="font-size: 1.15rem;">${s.title}</strong>
+                        </div>
+                        <span class="badge badge-${s.result.status}">${s.verdict}</span>
+                    </div>
+                    <p style="font-size: 0.95rem; color: #cbd5e1; margin-bottom: 1rem; line-height: 1.6;">
+                        ${s.description}
+                    </p>
+                    <div style="background: #090e1a; padding: 1rem; border-radius: 10px; border: 1px solid #1e293b; font-size: 0.85rem; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; color: var(--text-secondary);">
+                        <div>Insurer: <strong style="color:white;">${s.claim.insurer_id}</strong></div>
+                        <div>Amount: <strong style="color:white;">$${s.claim.claim_amount.toFixed(2)}</strong></div>
+                        <div>Provider: <strong style="color:white;">${s.claim.provider_id}</strong></div>
+                        <div style="grid-column: 1 / -1;">Narrative: <em>"${s.claim.description}"</em></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- ACADEMIC BENCHMARK ---
+        async function loadBenchmarkStats(threshold = 0.85) {
+            try {
+                const res = await fetch(`${API_BASE}/benchmark/stats?threshold=${threshold}`);
+                if (!res.ok) throw new Error("Failed to load benchmark");
+                const data = await res.json();
+
+                renderBenchmark(data);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function updateBenchmarkThreshold(val) {
+            document.getElementById('threshold-val-label').innerText = parseFloat(val).toFixed(2);
+            await loadBenchmarkStats(val);
+        }
+
+        function renderBenchmark(data) {
+            const m = data.metrics;
+            document.getElementById('bench-stat-precision').innerText = `${(m.precision * 100).toFixed(1)}%`;
+            document.getElementById('bench-stat-recall').innerText = `${(m.recall * 100).toFixed(1)}%`;
+            document.getElementById('bench-stat-f1').innerText = `${(m.f1_score * 100).toFixed(1)}%`;
+            document.getElementById('bench-stat-latency').innerText = `${data.latency_stats.mean_ms} ms`;
+            document.getElementById('bench-accuracy-badge').innerText = `Accuracy: ${(m.accuracy * 100).toFixed(1)}%`;
+
+            // Confusion Matrix
+            const cm = data.confusion_matrix;
+            document.getElementById('cm-tp').innerText = cm.true_positives;
+            document.getElementById('cm-fn').innerText = cm.false_negatives;
+            document.getElementById('cm-fp').innerText = cm.false_positives;
+            document.getElementById('cm-tn').innerText = cm.true_negatives;
+
+            // Samples Table
+            const tbody = document.getElementById('bench-samples-body');
+            tbody.innerHTML = data.sample_evaluations.map(s => `
+                <tr>
+                    <td><code>${s.claim_id}</code></td>
+                    <td><span style="font-size:0.85rem; color:var(--text-secondary);">${s.expected}</span></td>
+                    <td><strong style="color:${s.correct ? '#34d399' : '#f87171'}">${s.predicted}</strong></td>
+                    <td>${(s.confidence * 100).toFixed(1)}%</td>
+                    <td>${s.correct ? '✅ Pass' : '❌ Fail'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function exportAcademicSummary() {
+            const p = document.getElementById('bench-stat-precision').innerText;
+            const r = document.getElementById('bench-stat-recall').innerText;
+            const f1 = document.getElementById('bench-stat-f1').innerText;
+            const tp = document.getElementById('cm-tp').innerText;
+            const fp = document.getElementById('cm-fp').innerText;
+            const tn = document.getElementById('cm-tn').innerText;
+            const fn = document.getElementById('cm-fn').innerText;
+
+            const report = `
+============================================================
+CROSS-INSURER FRAUD DEDUPLICATION FRAMEWORK
+ACADEMIC EVALUATION & BENCHMARK SUMMARY
+============================================================
+Date: ${new Date().toISOString()}
+Consortium Architecture: Distributed Microservices + Salted SHA-256 + Smart Contract Registry
+
+EMPIRICAL PERFORMANCE METRICS:
+- Precision: ${p}
+- Recall (Sensitivity): ${r}
+- F1-Score: ${f1}
+- Mean Pipeline Latency: ${document.getElementById('bench-stat-latency').innerText}
+
+CONFUSION MATRIX:
+- True Positives (TP):  ${tp} (Duplicates correctly stopped)
+- True Negatives (TN):  ${tn} (Clean claims approved)
+- False Positives (FP): ${fp}
+- False Negatives (FN): ${fn}
+
+PRIVACY GUARANTEE:
+- Raw claimant identities (SSN) are masked with SHA-256 + consortium salt.
+- Competing insurers never view or share raw competitor claim history.
+============================================================
+            `;
+
+            const blob = new Blob([report.trim()], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "Consortium_Academic_Evaluation_Report.txt";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // --- RESET SYSTEM ---
+        async function resetConsortiumSystem() {
+            if (!confirm("Reset all databases, registry hashes, and blockchain ledger back to genesis state?")) return;
+            try {
+                await fetch(`${API_BASE}/debug/reset`, { method: 'DELETE' });
+                alert("Consortium system restored to genesis state!");
+                location.reload();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Load initial states
+        window.addEventListener('DOMContentLoaded', () => {
+            loadPreset('original');
+        });
+    </script>
+</body>
+</html>
